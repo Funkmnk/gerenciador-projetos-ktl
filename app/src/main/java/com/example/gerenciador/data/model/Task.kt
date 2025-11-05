@@ -3,7 +3,6 @@ package com.example.gerenciador.data.model
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
-import java.time.LocalDateTime
 
 @Entity(
     tableName = "tasks",
@@ -22,8 +21,8 @@ data class Task(
     val projectId: Long,
     val titulo: String,
     val descricao: String,
-    val dataCriacao: LocalDateTime = LocalDateTime.now(),
-    val dataConclusao: LocalDateTime? = null,
+    val dataCriacao: Long = System.currentTimeMillis(), // ← MUDE para Long
+    val dataConclusao: Long? = null, // ← MUDE para Long
     val status: TaskStatus = TaskStatus.PENDENTE
 )
 
