@@ -1,47 +1,56 @@
 package com.example.gerenciador
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
+import com.example.gerenciador.presentation.navigation.AppNavigation
 import com.example.gerenciador.ui.theme.GerenciadorTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // TESTE TEMPORÁRIO - REMOVA DEPOIS
+        testGitHubApi()
+
         setContent {
             GerenciadorTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavigation()
                 }
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun testGitHubApi() {
+        lifecycleScope.launch {
+            try {
+                val repository = com.example.gerenciador.data.repository.GitHubRepository()
+                val result = repository.getIssuesSafe("google", "material-design-icons")
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    GerenciadorTheme {
-        Greeting("Android")
+                if (result.isSuccess) {
+                    val issues = result.getOrNull() ?: emptyList()
+                    Log.d("API_TEST", "✅ Sucesso! ${issues.size} issues encontradas")
+                    issues.forEach { issue ->
+                        Log.d("API_TEST", "Issue: ${issue.title}")
+                    }
+                } else {
+                    val error = result.exceptionOrNull()
+                    Log.e("API_TEST", "❌ Erro na API: ${error?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e("API_TEST", "❌ Erro geral: ${e.message}")
+            }
+        }
     }
 }

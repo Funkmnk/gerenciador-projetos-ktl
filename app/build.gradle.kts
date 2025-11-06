@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    // TROQUE KSP POR KAPT
+    alias(libs.plugins.hilt)
     id("kotlin-kapt")
 }
 
@@ -85,4 +85,11 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     implementation(libs.okhttp.logging.interceptor)
+
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+}
+kapt {
+    correctErrorTypes = true
 }
