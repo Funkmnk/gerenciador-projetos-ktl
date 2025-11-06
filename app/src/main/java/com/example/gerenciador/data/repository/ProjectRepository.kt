@@ -6,114 +6,150 @@ import com.example.gerenciador.data.model.Project
 import com.example.gerenciador.data.model.ProjectStatus
 import com.example.gerenciador.data.model.Task
 import com.example.gerenciador.data.model.TaskStatus
+import com.example.gerenciador.data.remote.GitHubApi
+import com.example.gerenciador.data.adapter.GitHubAdapter
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
 
-class ProjectRepository(
+class ProjectRepository @Inject constructor(
     private val projectDao: ProjectDao,
-    private val taskDao: TaskDao
+    private val taskDao: TaskDao,
+    private val gitHubApi: GitHubApi // <- NOVO: Injetar a API
 ) {
 
-    // === MÉTODOS PARA PROJECTS ===
+    // === MÉTODOS EXISTENTES (MANTIDOS) ===
 
-    // Inserir novo projeto
+    // ... todos os seus métodos atuais permanecem EXATAMENTE como estão ...
+
+    // === MÉTODOS PARA PROJECTS ===
     suspend fun insertProject(project: Project): Long {
         return projectDao.insert(project)
     }
 
-    // Atualizar projeto existente
     suspend fun updateProject(project: Project): Int {
         return projectDao.update(project)
     }
 
-    // Deletar projeto
     suspend fun deleteProject(project: Project): Int {
         return projectDao.delete(project)
     }
 
-    // Buscar projeto por ID
     suspend fun getProjectById(id: Long): Project? {
         return projectDao.getById(id)
     }
 
-    // Obter todos os projetos (Flow para atualizações em tempo real)
     fun getAllProjects(): Flow<List<Project>> {
         return projectDao.getAll()
     }
 
-    // Obter projetos por status
     fun getProjectsByStatus(status: ProjectStatus): Flow<List<Project>> {
         return projectDao.getByStatus(status.name)
     }
 
-    // Obter projetos próximos do deadline
     fun getUpcomingDeadlines(): Flow<List<Project>> {
         return projectDao.getUpcomingDeadlines()
     }
 
-    // Obter projetos por cliente
     fun getProjectsByClient(clientName: String): Flow<List<Project>> {
         return projectDao.getByClient(clientName)
     }
 
-    // Contar total de projetos
     fun getProjectsCount(): Flow<Int> {
         return projectDao.getCount()
     }
 
-    // Buscar projetos (para futura implementação de search)
     fun searchProjects(query: String): Flow<List<Project>> {
-        return projectDao.getAll() // Por enquanto retorna todos, depois implementamos a busca
+        return projectDao.getAll()
     }
 
     // === MÉTODOS PARA TASKS ===
-
-    // Inserir nova tarefa
     suspend fun insertTask(task: Task): Long {
         return taskDao.insert(task)
     }
 
-    // Atualizar tarefa existente
     suspend fun updateTask(task: Task): Int {
         return taskDao.update(task)
     }
 
-    // Deletar tarefa
     suspend fun deleteTask(task: Task): Int {
         return taskDao.delete(task)
     }
 
-    // Buscar tarefa por ID
     suspend fun getTaskById(id: Long): Task? {
         return taskDao.getById(id)
     }
 
-    // Obter todas as tarefas de um projeto
     fun getTasksByProject(projectId: Long): Flow<List<Task>> {
         return taskDao.getByProject(projectId)
     }
 
-    // Obter tarefas por status
     fun getTasksByStatus(projectId: Long, status: TaskStatus): Flow<List<Task>> {
         return taskDao.getByStatus(projectId, status.name)
     }
 
-    // Obter tarefas pendentes
     fun getPendingTasks(): Flow<List<Task>> {
         return taskDao.getPendingTasks()
     }
 
-    // Contar tarefas por projeto
     fun getTaskCountByProject(projectId: Long): Flow<Int> {
         return taskDao.getCountByProject(projectId)
     }
 
-    // Contar tarefas por status
     fun getTaskCountByStatus(projectId: Long, status: TaskStatus): Flow<Int> {
         return taskDao.getCountByStatus(projectId, status.name)
     }
 
-    // Deletar tarefas de um projeto
     suspend fun deleteTasksByProject(projectId: Long): Int {
         return taskDao.deleteByProject(projectId)
+    }
+
+    // === NOVOS MÉTODOS PARA INTEGRAÇÃO COM GITHUB API ===
+
+    /**
+     * Importa issues do GitHub e converte em tasks para um projeto
+     * @param owner Dono do repositório (ex: "google")
+     * @param repo Nome do repositório (ex: "material-design-icons")
+     * @param projectId ID do projeto onde as tasks serão adicionadas
+     * @return Result com o número de tasks importadas ou erro
+     */
+    suspend fun importIssuesFromGitHub(owner: String, repo: String, projectId: Long): Result<Int> {
+        return try {
+            // 1. Fazer chamada para a API do GitHub
+            val response = gitHubApi.getIssues(owner, repo)
+
+            if (response.isSuccessful) {
+                val issues = response.body() ?: emptyList()
+
+                // 2. Converter issues do GitHub em tasks usando o adapter
+                val tasks = GitHubAdapter.toTaskList(issues, projectId)
+
+                // 3. Salvar todas as tasks no banco local
+                tasks.forEach { task ->
+                    taskDao.insert(task)
+                }
+
+                // 4. Retornar sucesso com quantidade de tasks importadas
+                Result.success(tasks.size)
+            } else {
+                // Erro HTTP (404, 500, etc)
+                Result.failure(Exception("Erro HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            // Erro de rede, timeout, etc
+            Result.failure(Exception("Erro de conexão: ${e.message}"))
+        }
+    }
+
+    /**
+     * Testa a conexão com a API do GitHub
+     * @return true se a API está acessível, false caso contrário
+     */
+    suspend fun testGitHubConnection(owner: String = "google", repo: String = "material-design-icons"): Boolean {
+        return try {
+            val response = gitHubApi.getIssues(owner, repo)
+            response.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
     }
 }
