@@ -13,7 +13,7 @@ object ApiClient {
 
     // Cria o interceptor de logging
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY // Mostra tudo: headers + body
+        level = HttpLoggingInterceptor.Level.BODY
     }
 
     // Cria o cliente HTTP customizado
@@ -25,7 +25,7 @@ object ApiClient {
         .build()
 
     // Instância do Retrofit
-    val instance: Retrofit by lazy {
+    private val instance: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(httpClient)

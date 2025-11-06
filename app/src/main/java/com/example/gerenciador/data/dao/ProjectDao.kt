@@ -37,8 +37,8 @@ interface ProjectDao {
     fun getByStatus(status: String): Flow<List<Project>>
 
     // Buscar projetos próximos do deadline (próximos 7 dias)
-    @Query("SELECT * FROM projects WHERE deadline BETWEEN datetime('now') AND datetime('now', '+7 days') ORDER BY deadline ASC")
-    fun getUpcomingDeadlines(): Flow<List<Project>>
+    @Query("SELECT * FROM projects WHERE deadline BETWEEN :currentTime AND :currentTime + 604800000 ORDER BY deadline ASC") // 604800000 = 7 dias em milissegundos
+    fun getUpcomingDeadlines(currentTime: Long = System.currentTimeMillis()): Flow<List<Project>>
 
     // Buscar projetos por cliente
     @Query("SELECT * FROM projects WHERE cliente LIKE '%' || :clientName || '%' ORDER BY nome ASC")

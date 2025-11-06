@@ -1,5 +1,7 @@
 package com.example.gerenciador.data.remote
 
+import com.example.gerenciador.data.remote.model.GitHubIssue
+import com.example.gerenciador.data.remote.model.GitHubSearchResponse
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Path

@@ -7,18 +7,24 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
-import com.example.gerenciador.presentation.navigation.AppNavigation
 import com.example.gerenciador.ui.theme.GerenciadorTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private companion object {
+        const val TAG = "GERENCIADOR_DEBUG"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // TESTE TEMPORÁRIO - REMOVA DEPOIS
-        testGitHubApi()
+        // TESTE SIMPLES - sem API por enquanto
+        Log.d(TAG, "🎯 APP INICIADO - Permissão de internet adicionada")
+
+        // COMENTE o teste da API temporariamente
+        // testApiSimples()
 
         setContent {
             GerenciadorTheme {
@@ -26,31 +32,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    Text(
+                        text = "✅ App Funcionando!\nPermissão de Internet Adicionada",
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
     }
 
-    private fun testGitHubApi() {
-        lifecycleScope.launch {
-            try {
-                val repository = com.example.gerenciador.data.repository.GitHubRepository()
-                val result = repository.getIssuesSafe("google", "material-design-icons")
-
-                if (result.isSuccess) {
-                    val issues = result.getOrNull() ?: emptyList()
-                    Log.d("API_TEST", "✅ Sucesso! ${issues.size} issues encontradas")
-                    issues.forEach { issue ->
-                        Log.d("API_TEST", "Issue: ${issue.title}")
-                    }
-                } else {
-                    val error = result.exceptionOrNull()
-                    Log.e("API_TEST", "❌ Erro na API: ${error?.message}")
-                }
-            } catch (e: Exception) {
-                Log.e("API_TEST", "❌ Erro geral: ${e.message}")
-            }
-        }
+    // COMENTE este método temporariamente
+    /*
+    private fun testApiSimples() {
+        // ... código comentado
     }
+    */
 }
