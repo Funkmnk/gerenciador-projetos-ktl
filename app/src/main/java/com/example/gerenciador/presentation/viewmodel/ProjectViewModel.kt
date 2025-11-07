@@ -11,8 +11,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+// Importações do hilt
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class ProjectViewModel(private val repository: ProjectRepository) : ViewModel() {
+@HiltViewModel
+class ProjectViewModel @Inject constructor(private val repository: ProjectRepository) : ViewModel() {
 
     // State para lista de projetos
     private val _projects = MutableStateFlow<List<Project>>(emptyList())

@@ -5,6 +5,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.gerenciador.presentation.screens.ProjectListScreen
+// Project Screen
+import com.example.gerenciador.presentation.screens.AddProjectScreen
 
 @Composable
 fun AppNavigation() {
@@ -18,7 +20,7 @@ fun AppNavigation() {
             ProjectListScreen(
                 onAddProject = {
                     // TODO: Navegar para tela de adicionar projeto
-                    // navController.navigate(Screen.AddProject.route)
+                    navController.navigate(Screen.AddProject.route)
                 },
                 onProjectClick = { projectId ->
                     // TODO: Navegar para detalhes do projeto
@@ -28,11 +30,13 @@ fun AppNavigation() {
         }
 
         // TODO: Adicionar outras telas quando estiverem prontas
-        /*
-        composable(route = Screen.AddProject.route) {
-            // AddProjectScreen(...)
-        }
 
+        composable(route = Screen.AddProject.route) {
+            AddProjectScreen(
+                navController = navController
+            )
+        }
+        /*
         composable(
             route = "${Screen.ProjectDetails.route}/{projectId}",
             arguments = listOf(navArgument("projectId") { type = NavType.LongType })
