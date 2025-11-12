@@ -29,25 +29,70 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.gerenciador.data.model.Project // Importe seu modelo
-import com.example.gerenciador.presentation.viewmodel.ProjectViewModel // Importe seu ViewModel
+import com.example.gerenciador.data.model.Project // Importe o modelo
+import com.example.gerenciador.presentation.viewmodel.ProjectViewModel // Importe o ViewModel
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProjectScreen(
     navController: NavController,
-    viewModel: ProjectViewModel = hiltViewModel() // Use o mesmo ViewModel
+    viewModel: ProjectViewModel = hiltViewModel(), projectId: Long?
 ) {
+    // Determina o modo de edição
+    val isEditMode = projectId != null
+
+    // Pega o projeto que está sendo editado
+    val projectToEdit by viewModel.selectedProject.collectAsState()
+
     // Estados para guardar o que o usuário digita
     var nome by remember { mutableStateOf("") }
     var descricao by remember { mutableStateOf("") }
     var cliente by remember { mutableStateOf("") }
     var deadline by remember { mutableStateOf("") } // Vamos tratar como texto por enquanto
 
+    LaunchedEffect(projectId) {
+        if (isEditMode && projectId != null) {
+            viewModel.loadProjectById(projectId)
+        } else {
+            viewModel.clearSelectedProject() // Garante que esteja limpo se for "Criar"
+        }
+    }
+
+    // 5. Efeito para preencher os campos (quando o projeto carregar)
+    LaunchedEffect(projectToEdit) {
+        if (isEditMode && projectToEdit != null) {
+            nome = projectToEdit!!.nome
+            descricao = projectToEdit!!.descricao
+            cliente = projectToEdit!!.cliente
+            // Formata o timestamp de volta para uma String legível (Exemplo simples)
+            deadline = try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                sdf.format(Date(projectToEdit!!.deadline))
+            } catch (e: Exception) {
+                ""
+            }
+        }
+    }
+
+    // 6. Limpar o state quando a tela for embora
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearSelectedProject()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Novo Projeto") },
+                // Título dinâmico
+                title = { Text(if (isEditMode) "Editar Projeto" else "Novo Projeto") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
@@ -100,30 +145,40 @@ fun AddProjectScreen(
 
                     // Converte a data (String) para Long (Timestamp)
                     val deadlineTimestamp = try {
-                        // Simples conversão de data (melhorar com DatePicker depois)
-                        // Por enquanto, vamos só usar o timestamp atual
-                        System.currentTimeMillis()
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        sdf.parse(deadline)?.time ?: System.currentTimeMillis()
                     } catch (e: Exception) {
                         System.currentTimeMillis()
                     }
 
-                    // Cria o objeto Project
-                    val novoProjeto = Project(
-                        nome = nome,
-                        descricao = descricao,
-                        cliente = cliente,
-                        deadline = deadlineTimestamp // Usando o timestamp
-                    )
+                    if (isEditMode && projectToEdit != null) {
+                        // Modo UPDATE
+                        val projetoAtualizado = projectToEdit!!.copy(
+                            nome = nome,
+                            descricao = descricao,
+                            cliente = cliente,
+                            deadline = deadlineTimestamp
+                        )
+                        viewModel.updateProject(projetoAtualizado)
 
-                    // Chama o ViewModel para salvar
-                    viewModel.insertProject(novoProjeto) //
+                    } else {
+                        // Modo CREATE (como já estava)
+                        val novoProjeto = Project(
+                            nome = nome,
+                            descricao = descricao,
+                            cliente = cliente,
+                            deadline = deadlineTimestamp
+                        )
+                        viewModel.insertProject(novoProjeto)
+                    }
 
                     // Volta para a tela anterior
                     navController.popBackStack()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("SALVAR PROJETO")
+                // Texto dinamico
+                Text(if (isEditMode) "ATUALIZAR PROJETO" else "SALVAR PROJETO")
             }
         }
     }

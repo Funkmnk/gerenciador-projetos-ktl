@@ -101,6 +101,38 @@ class ProjectViewModel @Inject constructor(private val repository: ProjectReposi
         _errorMessage.update { null }
     }
 
+    // --- CORREÇÕES ADICIONADAS ---
+    // (Funções que faltavam para a AddProjectScreen)
+
+    /**
+     * Carrega um projeto específico pelo ID para o state _selectedProject.
+     * Usado pela tela de edição.
+     */
+    fun loadProjectById(projectId: Long) {
+        viewModelScope.launch {
+            try {
+                _isLoading.update { true }
+                val project = repository.getProjectById(projectId)
+                _selectedProject.update { project }
+                _errorMessage.update { null }
+            } catch (e: Exception) {
+                _errorMessage.update { "Erro ao carregar projeto: ${e.message}" }
+            } finally {
+                _isLoading.update { false }
+            }
+        }
+    }
+
+    /**
+     * Limpa o projeto selecionado do state.
+     * Usado ao sair da tela de edição ou ao entrar na tela de criação.
+     */
+    fun clearSelectedProject() {
+        _selectedProject.update { null }
+    }
+
+    // --- FIM DAS CORREÇÕES ---
+
     // Buscar projetos por status
     fun getProjectsByStatus(status: ProjectStatus) {
         viewModelScope.launch {
