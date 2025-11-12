@@ -11,6 +11,8 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 // Importar a tela de Detalhes
 import com.example.gerenciador.presentation.screens.ProjectDetailsScreen
+// Importar a nova tela de Edição/Criação de Task
+import com.example.gerenciador.presentation.screens.TaskEditScreen
 
 @Composable
 fun AppNavigation() {
@@ -31,8 +33,6 @@ fun AppNavigation() {
                 }
             )
         }
-
-        // TODO: Adicionar outras telas quando estiverem prontas
 
         composable(
             route = Screen.AddProject.route, // A rota com argumento opcional
@@ -61,14 +61,18 @@ fun AppNavigation() {
             )
         }
 
-        /*
+        // --- NOVA TELA ADICIONADA AQUI ---
         composable(
-            route = "${Screen.ProjectDetails.route}/{projectId}", // <-- COMENTADO (NÃO MAIS NECESSÁRIO)
-            arguments = listOf(navArgument("projectId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val projectId = backStackEntry.arguments?.getLong("projectId") ?: 0L
-            // ProjectDetailsScreen(projectId = projectId, ...)
+            route = Screen.TaskEdit.route,
+            arguments = listOf(
+                navArgument("projectId") { type = NavType.LongType },
+                navArgument("taskId") {
+                    type = NavType.LongType
+                    defaultValue = -1L // O valor padrão para "Criar"
+                }
+            )
+        ) {
+            TaskEditScreen(navController = navController)
         }
-        */
     }
 }

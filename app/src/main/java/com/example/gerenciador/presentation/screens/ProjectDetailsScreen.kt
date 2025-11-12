@@ -51,6 +51,8 @@ fun ProjectDetailsScreen(
 
     // Boa prática: cria a cópia local estável
     val currentProject = project
+    // Pega o ID do projeto para passar para a próxima tela
+    val projectId = currentProject?.id ?: 0L
 
     Scaffold(
         topBar = {
@@ -87,8 +89,10 @@ fun ProjectDetailsScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // TODO: Implementar Task 3.2
-                    // navController.navigate(Screen.AddTask.withId(currentProject.id))
+                    // --- ALTERAÇÃO (Task 3.2) ---
+                    if (projectId != 0L) {
+                        navController.navigate(Screen.TaskEdit.create(projectId))
+                    }
                 },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
@@ -120,8 +124,10 @@ fun ProjectDetailsScreen(
                         TaskItem(
                             task = task,
                             onClick = {
-                                // TODO: Implementar Task 3.3
-                                // navController.navigate(Screen.EditTask.withId(task.id))
+                                // --- ALTERAÇÃO (Task 3.3) ---
+                                if (projectId != 0L) {
+                                    navController.navigate(Screen.TaskEdit.withId(projectId, task.id))
+                                }
                             }
                         )
                     }
