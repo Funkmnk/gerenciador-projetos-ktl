@@ -9,6 +9,8 @@ import com.example.gerenciador.presentation.screens.ProjectListScreen
 import com.example.gerenciador.presentation.screens.AddProjectScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+// Importar a tela de Detalhes
+import com.example.gerenciador.presentation.screens.ProjectDetailsScreen
 
 @Composable
 fun AppNavigation() {
@@ -25,8 +27,7 @@ fun AppNavigation() {
                     navController.navigate(Screen.AddProject.create())
                 },
                 onProjectClick = { projectId ->
-                    // TODO: Navegar para detalhes do projeto
-                    navController.navigate(Screen.AddProject.withId(projectId))
+                    navController.navigate(Screen.ProjectDetails.withId(projectId))
                 }
             )
         }
@@ -51,9 +52,18 @@ fun AppNavigation() {
             )
         }
 
+        composable(
+            route = Screen.ProjectDetails.route, // Rota com ID obrigatório
+            arguments = listOf(navArgument("projectId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            ProjectDetailsScreen(
+                navController = navController
+            )
+        }
+
         /*
         composable(
-            route = "${Screen.ProjectDetails.route}/{projectId}",
+            route = "${Screen.ProjectDetails.route}/{projectId}", // <-- COMENTADO (NÃO MAIS NECESSÁRIO)
             arguments = listOf(navArgument("projectId") { type = NavType.LongType })
         ) { backStackEntry ->
             val projectId = backStackEntry.arguments?.getLong("projectId") ?: 0L

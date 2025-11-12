@@ -12,7 +12,14 @@ sealed class Screen(val route: String) {
             return "add_project"
         }
     }
-    object ProjectDetails : Screen("project_details")
+
+    object ProjectDetails : Screen("project_details/{projectId}") {
+        // Helper function para construir a rota
+        fun withId(id: Long): String {
+            return "project_details/$id"
+        }
+    }
+
     object TaskList : Screen("task_list")
     object AddTask : Screen("add_task")
 }
