@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+// import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +38,11 @@ import androidx.compose.runtime.DisposableEffect
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +55,7 @@ fun AddProjectScreen(
 
     // Pega o projeto que está sendo editado
     val projectToEdit by viewModel.selectedProject.collectAsState()
+    val currentProject = projectToEdit
 
     // Estados para guardar o que o usuário digita
     var nome by remember { mutableStateOf("") }
@@ -57,21 +63,21 @@ fun AddProjectScreen(
     var cliente by remember { mutableStateOf("") }
     var deadline by remember { mutableStateOf("") } // Vamos tratar como texto por enquanto
 
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(projectId) {
         if (isEditMode && projectId != null) {
             viewModel.loadProjectById(projectId)
         } else {
-            viewModel.clearSelectedProject() // Garante que esteja limpo se for "Criar"
+            viewModel.clearSelectedProject()
         }
     }
 
-    // 5. Efeito para preencher os campos (quando o projeto carregar)
     LaunchedEffect(projectToEdit) {
         if (isEditMode && projectToEdit != null) {
             nome = projectToEdit!!.nome
             descricao = projectToEdit!!.descricao
             cliente = projectToEdit!!.cliente
-            // Formata o timestamp de volta para uma String legível (Exemplo simples)
             deadline = try {
                 val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 sdf.format(Date(projectToEdit!!.deadline))
@@ -81,7 +87,7 @@ fun AddProjectScreen(
         }
     }
 
-    // 6. Limpar o state quando a tela for embora
+    // Limpa o State
     DisposableEffect(Unit) {
         onDispose {
             viewModel.clearSelectedProject()
@@ -95,7 +101,9 @@ fun AddProjectScreen(
                 title = { Text(if (isEditMode) "Editar Projeto" else "Novo Projeto") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
+                        // --- CORREÇÃO (Bônus ArrowBack) ---
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                        // --- FIM DA CORREÇÃO ---
                     }
                 }
             )
@@ -151,9 +159,9 @@ fun AddProjectScreen(
                         System.currentTimeMillis()
                     }
 
-                    if (isEditMode && projectToEdit != null) {
+                    if (isEditMode && currentProject != null) { // Usando a cópia local
                         // Modo UPDATE
-                        val projetoAtualizado = projectToEdit!!.copy(
+                        val projetoAtualizado = currentProject.copy( // Usando a cópia local
                             nome = nome,
                             descricao = descricao,
                             cliente = cliente,
@@ -162,7 +170,6 @@ fun AddProjectScreen(
                         viewModel.updateProject(projetoAtualizado)
 
                     } else {
-                        // Modo CREATE (como já estava)
                         val novoProjeto = Project(
                             nome = nome,
                             descricao = descricao,
@@ -180,6 +187,61 @@ fun AddProjectScreen(
                 // Texto dinamico
                 Text(if (isEditMode) "ATUALIZAR PROJETO" else "SALVAR PROJETO")
             }
+
+            // Botão de excluir (só aparece no modo de edição)
+            if (isEditMode) {
+                Spacer(modifier = Modifier.height(8.dp)) // Um respiro
+
+                OutlinedButton(
+                    onClick = {
+                        // Abre o dialog de confirmação
+                        showDeleteDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error // Vermelho
+                    )
+                ) {
+                    Text("EXCLUIR PROJETO")
+                }
+            }
+        }
+
+        // Dialog de Confirmação de Exclusão
+        if (showDeleteDialog && isEditMode && currentProject != null) { // Usando a cópia local
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Confirmar Exclusão") },
+                text = { Text("Tem certeza que deseja excluir o projeto \"${currentProject.nome}\"? Esta ação não pode ser desfeita.") }, // Usando a cópia local
+
+                // Botão de Confirmação (Excluir)
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            // Chama o ViewModel para deletar
+                            viewModel.deleteProject(currentProject) // Usando a cópia local
+                            // Fecha o dialog
+                            showDeleteDialog = false
+                            // Volta para a tela de lista
+                            navController.popBackStack()
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error // Cor vermelha
+                        )
+                    ) {
+                        Text("Excluir")
+                    }
+                },
+
+                // Botão de Cancelar
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeleteDialog = false } // Só fecha o dialog
+                    ) {
+                        Text("Cancelar")
+                    }
+                }
+            )
         }
     }
 }
