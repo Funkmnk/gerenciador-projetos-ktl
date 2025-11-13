@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Download // (Ícone do passo anterior)
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,11 +23,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,52 +39,57 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.gerenciador.data.model.Task
-import com.example.gerenciador.presentation.navigation.Screen // A gente vai precisar disso
+import com.example.gerenciador.presentation.navigation.Screen // Import principal
+import com.example.gerenciador.presentation.screens.composables.GitHubImportDialog
 import com.example.gerenciador.presentation.viewmodel.ProjectDetailsViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectDetailsScreen(
     navController: NavController,
-    // Hilt injeta o ViewModel e o SavedStateHandle pra gente, tudo automático
     viewModel: ProjectDetailsViewModel = hiltViewModel()
 ) {
-    // 1. Coleta os states do ViewModel que a gente criou
+    // ... (States e Snackbar permanecem iguais) ...
     val project by viewModel.project.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-
-    // Boa prática: cria a cópia local estável
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val showImportDialog by viewModel.showGitHubImportDialog.collectAsState()
+    val importState by viewModel.githubImportState.collectAsState()
     val currentProject = project
+    val projectId = currentProject?.id ?: 0L
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearErrorMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    // Mostra o nome do projeto (ou "Carregando...")
-                    Text(currentProject?.nome ?: "Carregando Detalhes...")
-                },
+                title = { Text(currentProject?.nome ?: "Detalhes do Projeto") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Voltar"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
                     }
                 },
                 actions = {
-                    // --- O "Pulo do Gato" da nossa Opção A ---
-                    // Botão de Editar que leva para a tela de Edição
+                    // Botão de Importar
+                    IconButton(onClick = { viewModel.openGitHubImportDialog() }) {
+                        Icon(Icons.Default.Download, "Importar do GitHub")
+                    }
+                    // Botão de Editar Projeto
                     IconButton(onClick = {
-                        if (currentProject != null) {
-                            // Navega para a tela de Edição passando o ID
-                            navController.navigate(Screen.AddProject.withId(currentProject.id))
+                        if (projectId != 0L) {
+                            // (Chamada para AddProject continua a mesma)
+                            navController.navigate(Screen.AddProject.withId(projectId))
                         }
                     }) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Editar Projeto"
-                        )
+                        Icon(Icons.Default.Edit, "Editar Projeto")
                     }
                 }
             )
@@ -87,32 +97,35 @@ fun ProjectDetailsScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // TODO: Implementar Task 3.2
-                    // navController.navigate(Screen.AddTask.withId(currentProject.id))
-                },
-                containerColor = MaterialTheme.colorScheme.primary
+                    if (projectId != 0L) {
+                        // --- ✅ CORREÇÃO APLICADA AQUI ---
+                        // Chamando a nova rota de criação de task
+                        navController.navigate(Screen.TaskEdit.create(projectId))
+                    }
+                }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Adicionar Tarefa")
+                Icon(Icons.Default.Add, "Adicionar Tarefa")
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading && currentProject == null) {
-                // Loading inicial
+            // ... (Lógica de Loading e Estado Vazio permanece a mesma) ...
+            if (isLoading && tasks.isEmpty()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (tasks.isEmpty() && !isLoading) {
-                // Estado Vazio
                 Text(
                     text = "Nenhuma tarefa encontrada. Toque em + para adicionar.",
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
-                // 3. A Lista de Tarefas (Task 3.1)
+                // Lista de Tarefas
                 LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -120,27 +133,37 @@ fun ProjectDetailsScreen(
                         TaskItem(
                             task = task,
                             onClick = {
-                                // TODO: Implementar Task 3.3
-                                // navController.navigate(Screen.EditTask.withId(task.id))
+                                // --- ✅ CORREÇÃO APLICADA AQUI ---
+                                // Chamando a nova rota de edição de task
+                                navController.navigate(Screen.TaskEdit.withId(projectId, task.id))
                             }
                         )
                     }
                 }
             }
+
+            // Dialog do GitHub Import (permanece igual)
+            GitHubImportDialog(
+                showDialog = showImportDialog,
+                owner = importState.owner,
+                repo = importState.repo,
+                onOwnerChange = viewModel::onGitHubOwnerChange,
+                onRepoChange = viewModel::onGitHubRepoChange,
+                onDismiss = viewModel::closeGitHubImportDialog,
+                onConfirm = viewModel::importGitHubIssues
+            )
         }
     }
 }
 
-/**
- * Um Composable simples para mostrar um item da lista de tarefas.
- * (Isso implementa o "Read" da Task 3.1)
- */
+// O TaskItem (Composable) permanece o mesmo
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskItem(
     task: Task,
     onClick: () -> Unit
 ) {
+    // ... (código do TaskItem) ...
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),

@@ -101,9 +101,6 @@ class ProjectViewModel @Inject constructor(private val repository: ProjectReposi
         _errorMessage.update { null }
     }
 
-    // --- CORREÇÕES ADICIONADAS ---
-    // (Funções que faltavam para a AddProjectScreen)
-
     /**
      * Carrega um projeto específico pelo ID para o state _selectedProject.
      * Usado pela tela de edição.
@@ -130,8 +127,6 @@ class ProjectViewModel @Inject constructor(private val repository: ProjectReposi
     fun clearSelectedProject() {
         _selectedProject.update { null }
     }
-
-    // --- FIM DAS CORREÇÕES ---
 
     // Buscar projetos por status
     fun getProjectsByStatus(status: ProjectStatus) {

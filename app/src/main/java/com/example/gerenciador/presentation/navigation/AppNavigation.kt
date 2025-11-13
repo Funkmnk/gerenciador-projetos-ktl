@@ -1,16 +1,15 @@
 package com.example.gerenciador.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.gerenciador.presentation.screens.ProjectListScreen
-// Project Screen
-import com.example.gerenciador.presentation.screens.AddProjectScreen
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
-// Importar a tela de Detalhes
+import com.example.gerenciador.presentation.screens.AddProjectScreen
 import com.example.gerenciador.presentation.screens.ProjectDetailsScreen
+import com.example.gerenciador.presentation.screens.ProjectListScreen
+import com.example.gerenciador.presentation.screens.TaskEditScreen
 
 @Composable
 fun AppNavigation() {
@@ -20,10 +19,11 @@ fun AppNavigation() {
         navController = navController,
         startDestination = Screen.ProjectList.route
     ) {
+        // ... (composable 'ProjectList' e 'AddProject' continuam iguais) ...
+
         composable(route = Screen.ProjectList.route) {
             ProjectListScreen(
                 onAddProject = {
-                    // TODO: Navegar para tela de adicionar projeto
                     navController.navigate(Screen.AddProject.create())
                 },
                 onProjectClick = { projectId ->
@@ -32,43 +32,49 @@ fun AppNavigation() {
             )
         }
 
-        // TODO: Adicionar outras telas quando estiverem prontas
-
         composable(
-            route = Screen.AddProject.route, // A rota com argumento opcional
+            route = Screen.AddProject.route,
             arguments = listOf(
                 navArgument("projectId") {
                     type = NavType.LongType
-                    defaultValue = -1L // Um valor padrão que significa "nenhum ID"
+                    defaultValue = -1L
                 }
             )
         ) { backStackEntry ->
-            // A gente pega o ID que veio pela rota
             val projectId = backStackEntry.arguments?.getLong("projectId") ?: -1L
-
             AddProjectScreen(
                 navController = navController,
-                projectId = if (projectId == -1L) null else projectId // Passa null se for -1
+                projectId = if (projectId == -1L) null else projectId
             )
         }
 
+
         composable(
-            route = Screen.ProjectDetails.route, // Rota com ID obrigatório
+            route = Screen.ProjectDetails.route,
             arguments = listOf(navArgument("projectId") { type = NavType.LongType })
-        ) { backStackEntry ->
+        ) {
             ProjectDetailsScreen(
                 navController = navController
             )
         }
 
-        /*
+        // --- ✅ CORREÇÃO APLICADA AQUI ---
+        // Atualiza a rota para bater com o novo Screen.kt
         composable(
-            route = "${Screen.ProjectDetails.route}/{projectId}", // <-- COMENTADO (NÃO MAIS NECESSÁRIO)
-            arguments = listOf(navArgument("projectId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val projectId = backStackEntry.arguments?.getLong("projectId") ?: 0L
-            // ProjectDetailsScreen(projectId = projectId, ...)
+            route = Screen.TaskEdit.route, // Usa a nova rota
+            arguments = listOf(
+                navArgument("projectId") { // ID do projeto (obrigatório)
+                    type = NavType.LongType
+                    defaultValue = -1L // (Fallback, embora 'create' sempre deva passar)
+                },
+                navArgument("taskId") { // ID da task (opcional)
+                    type = NavType.LongType
+                    defaultValue = -1L // Valor padrão para "Criar nova task"
+                }
+            )
+        ) {
+            // O mesmo TaskEditScreen funciona aqui
+            TaskEditScreen(navController = navController)
         }
-        */
     }
 }

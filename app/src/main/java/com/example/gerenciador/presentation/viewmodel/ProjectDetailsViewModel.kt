@@ -3,15 +3,15 @@ package com.example.gerenciador.presentation.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.gerenciador.data.model.Project
-import com.example.gerenciador.data.model.Task
+import com.example.gerenciador.data.model.Project // ✅ Import necessário
+import com.example.gerenciador.data.model.Task // ✅ Import necessário
 import com.example.gerenciador.data.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn // ✅ Import necessário
+import kotlinx.coroutines.flow.onEach // ✅ Import necessário
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,6 +22,10 @@ class ProjectDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    // --- 1. CORREÇÃO: Ler o ID como LONG ---
+    private val navProjectId: Long = savedStateHandle.get<Long>("projectId") ?: 0L
+
+    // States existentes do projeto
     private val _project = MutableStateFlow<Project?>(null)
     val project: StateFlow<Project?> = _project.asStateFlow()
 
@@ -34,55 +38,107 @@ class ProjectDetailsViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val projectId: Long = checkNotNull(savedStateHandle["projectId"])
+    // --- TASK 4.3 & 4.4: GITHUB IMPORT ---
+    private val _showGitHubImportDialog = MutableStateFlow(false)
+    val showGitHubImportDialog: StateFlow<Boolean> = _showGitHubImportDialog.asStateFlow()
+
+    private val _githubImportState = MutableStateFlow(GitHubImportState())
+    val githubImportState: StateFlow<GitHubImportState> = _githubImportState.asStateFlow()
 
     init {
-        loadProjectDetails()
-        loadTasks()
+        // O ID agora é Long, tudo vai funcionar
+        if (navProjectId != 0L) {
+            loadProjectDetails()
+            loadTasks()
+        } else {
+            _errorMessage.update { "Erro fatal: ID do projeto não recebido." }
+        }
     }
 
-    private fun loadProjectDetails() {
+    // --- FUNÇÕES DO GITHUB IMPORT ---
+    fun onGitHubOwnerChange(owner: String) {
+        _githubImportState.update { it.copy(owner = owner) }
+    }
+
+    fun onGitHubRepoChange(repo: String) {
+        _githubImportState.update { it.copy(repo = repo) }
+    }
+
+    fun openGitHubImportDialog() {
+        _showGitHubImportDialog.value = true
+        _errorMessage.value = null // Limpa erros antigos
+    }
+
+    fun closeGitHubImportDialog() {
+        _showGitHubImportDialog.value = false
+        _githubImportState.value = GitHubImportState() // Limpa o formulário
+    }
+
+    fun importGitHubIssues() {
+        val state = _githubImportState.value
+
+        if (state.owner.isBlank() || state.repo.isBlank()) {
+            _errorMessage.value = "Preencha Dono e Repositório."
+            return
+        }
+
         viewModelScope.launch {
-            _isLoading.update { true }
+            _isLoading.value = true
+            _errorMessage.value = null
+
             try {
-                val projectDetails = repository.getProjectById(projectId)
-                _project.update { projectDetails }
+                // Chama o Repositório (que espera um Long)
+                val result = repository.importIssuesFromGitHub(
+                    owner = state.owner,
+                    repo = state.repo,
+                    projectId = navProjectId // ✅ Agora é Long
+                )
+
+                // Sucesso
+                _errorMessage.value = "✅ ${result.getOrThrow()} tarefas importadas!"
+                closeGitHubImportDialog()
+                // O Flow do loadTasks() vai cuidar de atualizar a lista sozinho
+
             } catch (e: Exception) {
-                _errorMessage.update { "Erro ao carregar projeto: ${e.message}" }
+                // Erro
+                _errorMessage.value = "❌ Erro ao importar: ${e.message}"
             } finally {
-                _isLoading.update { false } // Pode ser mais granular se quiser
+                _isLoading.value = false
             }
         }
     }
 
+    // --- FUNÇÕES EXISTENTES ---
+    private fun loadProjectDetails() {
+        viewModelScope.launch {
+            try {
+                val projectDetails = repository.getProjectById(navProjectId) // ✅ Agora é Long
+                _project.value = projectDetails
+            } catch (e: Exception) {
+                _errorMessage.value = "Erro ao carregar projeto: ${e.message}"
+            }
+        }
+    }
+
+    // --- 2. CORREÇÃO: loadTasks() agora é REATIVO ---
     private fun loadTasks() {
-        repository.getTasksByProject(projectId)
+        // Isso fica "escutando" o banco de dados.
+        // Se o importGitHubIssues() adicionar tasks, a UI atualiza sozinha.
+        repository.getTasksByProject(navProjectId) // ✅ Agora é Long
             .onEach { taskList ->
                 _tasks.update { taskList }
             }
-            .launchIn(viewModelScope) // Mantém a coroutine viva
+            .launchIn(viewModelScope)
     }
 
-    fun addTask(task: Task) {
-        viewModelScope.launch {
-            repository.insertTask(task)
-            // O Flow do loadTasks() vai atualizar a UI sozinho
-        }
-    }
-
-    fun updateTask(task: Task) {
-        viewModelScope.launch {
-            repository.updateTask(task)
-        }
-    }
-
-    fun deleteTask(task: Task) {
-        viewModelScope.launch {
-            repository.deleteTask(task)
-        }
-    }
-
+    // Função para o Snackbar (que o ProjectDetailsScreen precisa)
     fun clearErrorMessage() {
-        _errorMessage.update { null }
+        _errorMessage.value = null
     }
+
+    // Data class para estado do formulário GitHub
+    data class GitHubImportState(
+        val owner: String = "",
+        val repo: String = ""
+    )
 }

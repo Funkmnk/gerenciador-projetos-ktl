@@ -3,5 +3,5 @@ plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
-    alias(libs.plugins.hilt) apply false  // ADICIONE ESTA LINHA
+    alias(libs.plugins.hilt) apply false
 }
