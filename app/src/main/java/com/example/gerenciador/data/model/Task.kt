@@ -21,9 +21,13 @@ data class Task(
     val projectId: Long,
     val titulo: String,
     val descricao: String,
-    val dataCriacao: Long = System.currentTimeMillis(), // ← MUDE para Long
-    val dataConclusao: Long? = null, // ← MUDE para Long
-    val status: TaskStatus = TaskStatus.PENDENTE
+    val dataCriacao: Long = System.currentTimeMillis(),
+    val dataConclusao: Long? = null,
+    val status: TaskStatus = TaskStatus.PENDENTE,
+    // 🆕 NOVOS CAMPOS PARA O TIMER
+    val tempoTrabalhado: Long = 0L, // Tempo em milissegundos
+    val timerAtivo: Boolean = false, // Se o timer está rodando
+    val ultimoInicioTimer: Long = 0L // Timestamp de quando foi iniciado
 )
 
 enum class TaskStatus {

@@ -1,5 +1,7 @@
 package com.example.gerenciador.presentation.screens
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +16,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,19 +30,25 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.gerenciador.data.model.ProjectStatus
 import com.example.gerenciador.presentation.viewmodel.ProjectViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,7 +59,8 @@ import java.util.Locale
 fun ProjectListScreen(
     viewModel: ProjectViewModel = hiltViewModel(),
     onAddProject: () -> Unit,
-    onProjectClick: (Long) -> Unit
+    onProjectClick: (Long) -> Unit,
+    onImportFromGitHub: () -> Unit
 ) {
     val projects by viewModel.projects.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -60,15 +73,46 @@ fun ProjectListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Meus Projetos") }
+                title = {
+                    Column {
+                        Text("Meus Projetos")
+                        Text(
+                            text = "${projects.size} projetos",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddProject,
-                containerColor = MaterialTheme.colorScheme.primary
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Adicionar Projeto")
+                // Botão de Importar do GitHub
+                FloatingActionButton(
+                    onClick = onImportFromGitHub,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = "Importar do GitHub"
+                    )
+                }
+
+                // Botão de Adicionar Projeto
+                FloatingActionButton(
+                    onClick = onAddProject,
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Adicionar Projeto")
+                }
             }
         }
     ) { paddingValues ->
@@ -83,7 +127,7 @@ fun ProjectListScreen(
                 )
             } else {
                 if (projects.isEmpty()) {
-                    EmptyProjectsState()
+                    EmptyProjectsState(onImportClick = onImportFromGitHub)
                 } else {
                     ProjectList(
                         projects = projects,
@@ -134,67 +178,139 @@ fun ProjectCard(
 
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = project.nome,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // Header com nome e badge de status
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = project.nome,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
+                // Badge de status
+                StatusBadge(status = project.status)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Descrição
             Text(
                 text = project.descricao,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            // Informações adicionais
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "Cliente: ${project.cliente}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Cliente
+                InfoChip(
+                    icon = Icons.Default.Person,
+                    text = project.cliente,
+                    modifier = Modifier.weight(1f)
                 )
 
-                Text(
-                    text = "Prazo: ${dateFormatter.format(Date(project.deadline))}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Prazo
+                InfoChip(
+                    icon = Icons.Default.CalendarToday,
+                    text = dateFormatter.format(Date(project.deadline)),
+                    modifier = Modifier.weight(1f)
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Status: ${project.status.name}",
-                style = MaterialTheme.typography.bodySmall,
-                color = when (project.status) {
-                    com.example.gerenciador.data.model.ProjectStatus.EM_ANDAMENTO -> MaterialTheme.colorScheme.primary
-                    com.example.gerenciador.data.model.ProjectStatus.CONCLUIDO -> MaterialTheme.colorScheme.primary
-                    com.example.gerenciador.data.model.ProjectStatus.CANCELADO -> MaterialTheme.colorScheme.error
-                }
-            )
         }
     }
 }
 
 @Composable
-fun EmptyProjectsState() {
+fun StatusBadge(status: ProjectStatus) {
+    val (backgroundColor, textColor, text) = when (status) {
+        ProjectStatus.EM_ANDAMENTO -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            "Em Andamento"
+        )
+        ProjectStatus.CONCLUIDO -> Triple(
+            Color(0xFF4CAF50).copy(alpha = 0.2f),
+            Color(0xFF2E7D32),
+            "Concluído"
+        )
+        ProjectStatus.CANCELADO -> Triple(
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.onErrorContainer,
+            "Cancelado"
+        )
+    }
+
+    Surface(
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+        color = backgroundColor
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = textColor
+        )
+    }
+}
+
+@Composable
+fun InfoChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun EmptyProjectsState(onImportClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -205,24 +321,39 @@ fun EmptyProjectsState() {
         Icon(
             imageVector = Icons.Default.Search,
             contentDescription = "Nenhum projeto",
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Text(
             text = "Nenhum projeto encontrado",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Toque no botão + para adicionar seu primeiro projeto",
+            text = "Toque no botão + para adicionar\nseu primeiro projeto",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        OutlinedButton(
+            onClick = onImportClick
+        ) {
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text("Ou importe do GitHub")
+        }
     }
 }

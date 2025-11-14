@@ -7,6 +7,8 @@ import com.example.gerenciador.data.model.Task
 import com.example.gerenciador.data.model.TaskStatus
 import com.example.gerenciador.data.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,29 +22,16 @@ class TaskEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    // Pega os IDs da rota de navegação
     private val projectId: Long = checkNotNull(savedStateHandle["projectId"])
     private val taskId: Long = savedStateHandle.get<Long>("taskId") ?: -1L
 
-    // Determina se estamos em modo de Edição
     val isEditMode = (taskId != -1L)
 
-    // State para os campos da UI
     private val _taskUiState = MutableStateFlow(TaskUiState())
     val taskUiState: StateFlow<TaskUiState> = _taskUiState.asStateFlow()
 
-    // --- INÍCIO DA ALTERAÇÃO ---
-    // Adiciona o state de erro
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
-
-    /**
-     * Limpa a mensagem de erro (usado pela UI após exibir o Snackbar)
-     */
-    fun clearErrorMessage() {
-        _errorMessage.update { null }
-    }
-    // --- FIM DA ALTERAÇÃO ---
+    // 🆕 Job para controlar a coroutine do timer
+    private var timerJob: Job? = null
 
     init {
         if (isEditMode) {
@@ -50,82 +39,185 @@ class TaskEditViewModel @Inject constructor(
         }
     }
 
-    // Se for modo de edição, carrega os dados da task
     private fun loadTaskDetails() {
         viewModelScope.launch {
-            val task = repository.getTaskById(taskId) //
+            val task = repository.getTaskById(taskId)
             if (task != null) {
                 _taskUiState.update {
                     it.copy(
                         titulo = task.titulo,
                         descricao = task.descricao,
                         status = task.status,
-                        taskOriginal = task // Guarda o original para Update/Delete
+                        tempoTrabalhado = task.tempoTrabalhado,
+                        timerAtivo = false, // 🆕 Sempre inicia pausado
+                        ultimoInicioTimer = 0L,
+                        taskOriginal = task
                     )
                 }
+
+                // 🆕 REMOVIDO: Não retoma o timer automaticamente
+                // Se quiser que retome, descomente a linha abaixo:
+                // if (task.timerAtivo) { startTimer() }
             }
         }
     }
 
-    // Chamado quando o usuário digita
     fun onTituloChange(titulo: String) {
         _taskUiState.update { it.copy(titulo = titulo) }
     }
+
     fun onDescricaoChange(descricao: String) {
         _taskUiState.update { it.copy(descricao = descricao) }
     }
+
     fun onStatusChange(status: TaskStatus) {
         _taskUiState.update { it.copy(status = status) }
     }
 
-    // Botão SALVAR / ATUALIZAR
+    // 🆕 FUNÇÕES DO TIMER
+
+    /**
+     * Inicia ou pausa o timer
+     */
+    fun toggleTimer() {
+        val state = _taskUiState.value
+
+        if (state.timerAtivo) {
+            // Pausar
+            pauseTimer()
+        } else {
+            // Iniciar
+            startTimer()
+        }
+    }
+
+    private fun startTimer() {
+        _taskUiState.update {
+            it.copy(
+                timerAtivo = true,
+                ultimoInicioTimer = System.currentTimeMillis()
+            )
+        }
+
+        // Inicia a coroutine do timer
+        timerJob = viewModelScope.launch {
+            while (true) {
+                delay(1000) // Atualiza a cada 1 segundo
+
+                val state = _taskUiState.value
+                val tempoDecorrido = System.currentTimeMillis() - state.ultimoInicioTimer
+
+                _taskUiState.update {
+                    it.copy(
+                        tempoTrabalhadoAtual = state.tempoTrabalhado + tempoDecorrido
+                    )
+                }
+            }
+        }
+
+        // Salva no banco que o timer está ativo
+        saveTimerState()
+    }
+
+    private fun pauseTimer() {
+        timerJob?.cancel()
+        timerJob = null
+
+        val state = _taskUiState.value
+        val tempoDecorrido = System.currentTimeMillis() - state.ultimoInicioTimer
+        val novoTempoTotal = state.tempoTrabalhado + tempoDecorrido
+
+        _taskUiState.update {
+            it.copy(
+                timerAtivo = false,
+                tempoTrabalhado = novoTempoTotal,
+                tempoTrabalhadoAtual = novoTempoTotal,
+                ultimoInicioTimer = 0L
+            )
+        }
+
+        // Salva o tempo acumulado no banco
+        saveTimerState()
+    }
+
+    /**
+     * 🆕 Pausa o timer ao sair da tela (chamado pelo DisposableEffect)
+     */
+    fun pauseTimerOnExit() {
+        if (_taskUiState.value.timerAtivo) {
+            pauseTimer()
+        }
+    }
+
+    private fun saveTimerState() {
+        viewModelScope.launch {
+            val state = _taskUiState.value
+            if (isEditMode && state.taskOriginal != null) {
+                val taskAtualizada = state.taskOriginal.copy(
+                    tempoTrabalhado = state.tempoTrabalhado,
+                    timerAtivo = state.timerAtivo,
+                    ultimoInicioTimer = state.ultimoInicioTimer
+                )
+                repository.updateTask(taskAtualizada)
+            }
+        }
+    }
+
     fun saveTask() {
         viewModelScope.launch {
             val state = _taskUiState.value
 
-            // --- ALTERAÇÃO (Bônus: Validação para testar o erro) ---
-            if (state.titulo.isBlank()) {
-                _errorMessage.update { "O título não pode estar vazio!" }
-                return@launch // Para a execução
+            // Se o timer estava ativo, pausa antes de salvar
+            if (state.timerAtivo) {
+                pauseTimer()
             }
-            // --- FIM DA ALTERAÇÃO ---
 
             if (isEditMode && state.taskOriginal != null) {
-                // Modo UPDATE (Task 3.3)
                 val taskAtualizada = state.taskOriginal.copy(
                     titulo = state.titulo,
                     descricao = state.descricao,
-                    status = state.status
+                    status = state.status,
+                    tempoTrabalhado = state.tempoTrabalhado,
+                    timerAtivo = false,
+                    ultimoInicioTimer = 0L
                 )
-                repository.updateTask(taskAtualizada) //
+                repository.updateTask(taskAtualizada)
             } else {
-                // Modo CREATE (Task 3.2)
                 val novaTask = Task(
                     projectId = projectId,
                     titulo = state.titulo,
                     descricao = state.descricao,
-                    status = state.status
+                    status = state.status,
+                    tempoTrabalhado = state.tempoTrabalhado
                 )
-                repository.insertTask(novaTask) //
+                repository.insertTask(novaTask)
             }
         }
     }
 
-    // Botão DELETAR (Task 3.4)
     fun deleteTask() {
         viewModelScope.launch {
+            timerJob?.cancel() // Cancela o timer se estiver ativo
             val state = _taskUiState.value
             if (isEditMode && state.taskOriginal != null) {
-                repository.deleteTask(state.taskOriginal) //
+                repository.deleteTask(state.taskOriginal)
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        timerJob?.cancel() // Limpa o timer ao destruir o ViewModel
     }
 }
 
-// Data class para guardar o estado dos campos da UI
 data class TaskUiState(
     val titulo: String = "",
     val descricao: String = "",
     val status: TaskStatus = TaskStatus.PENDENTE,
-    val taskOriginal: Task? = null // Referência para a task em edição
+    val tempoTrabalhado: Long = 0L,
+    val timerAtivo: Boolean = false,
+    val ultimoInicioTimer: Long = 0L,
+    val tempoTrabalhadoAtual: Long = 0L, // Para exibir em tempo real
+    val taskOriginal: Task? = null
 )

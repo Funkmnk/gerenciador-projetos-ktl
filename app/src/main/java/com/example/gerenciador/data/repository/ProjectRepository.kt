@@ -14,12 +14,8 @@ import javax.inject.Inject
 class ProjectRepository @Inject constructor(
     private val projectDao: ProjectDao,
     private val taskDao: TaskDao,
-    private val gitHubApi: GitHubApi // <- NOVO: Injetar a API
+    private val gitHubApi: GitHubApi
 ) {
-
-    // === MÉTODOS EXISTENTES (MANTIDOS) ===
-
-    // ... todos os seus métodos atuais permanecem EXATAMENTE como estão ...
 
     // === MÉTODOS PARA PROJECTS ===
     suspend fun insertProject(project: Project): Long {
@@ -103,47 +99,33 @@ class ProjectRepository @Inject constructor(
         return taskDao.deleteByProject(projectId)
     }
 
-    // === NOVOS MÉTODOS PARA INTEGRAÇÃO COM GITHUB API ===
+    // ✅ NOVA FUNÇÃO: Atualizar status da tarefa
+    suspend fun updateTaskStatus(taskId: Long, newStatus: TaskStatus) {
+        taskDao.updateTaskStatus(taskId, newStatus.name)
+    }
 
-    /**
-     * Importa issues do GitHub e converte em tasks para um projeto
-     * @param owner Dono do repositório (ex: "google")
-     * @param repo Nome do repositório (ex: "material-design-icons")
-     * @param projectId ID do projeto onde as tasks serão adicionadas
-     * @return Result com o número de tasks importadas ou erro
-     */
+    // === MÉTODOS PARA INTEGRAÇÃO COM GITHUB API ===
     suspend fun importIssuesFromGitHub(owner: String, repo: String, projectId: Long): Result<Int> {
         return try {
-            // 1. Fazer chamada para a API do GitHub
             val response = gitHubApi.getIssues(owner, repo)
 
             if (response.isSuccessful) {
                 val issues = response.body() ?: emptyList()
-
-                // 2. Converter issues do GitHub em tasks usando o adapter
                 val tasks = GitHubAdapter.toTaskList(issues, projectId)
 
-                // 3. Salvar todas as tasks no banco local
                 tasks.forEach { task ->
                     taskDao.insert(task)
                 }
 
-                // 4. Retornar sucesso com quantidade de tasks importadas
                 Result.success(tasks.size)
             } else {
-                // Erro HTTP (404, 500, etc)
                 Result.failure(Exception("Erro HTTP ${response.code()}: ${response.message()}"))
             }
         } catch (e: Exception) {
-            // Erro de rede, timeout, etc
             Result.failure(Exception("Erro de conexão: ${e.message}"))
         }
     }
 
-    /**
-     * Testa a conexão com a API do GitHub
-     * @return true se a API está acessível, false caso contrário
-     */
     suspend fun testGitHubConnection(owner: String = "google", repo: String = "material-design-icons"): Boolean {
         return try {
             val response = gitHubApi.getIssues(owner, repo)
